@@ -1,0 +1,85 @@
+# Replace the following with valid values
+# <FIXME:service_account_name>: A valid service account name for e.g. vault-server
+# <FIXME:service_account_email_address> : A valid service account email address
+#     for e.g. if the service account name is valut-server, 
+#     then service_account_email_address will be in format
+#     vault-server@${PROJECT_ID}.iam.gserviceaccount.com
+#
+# <FIXME:vault_storage_bucket_name>: A globally unique storage bucket name
+# <FIXME:vault_network_name>: A valid VPC network name
+# <FIXME:vault_subnet_name>: A valid VPC subnet name
+# <FIXME:region>: for e.g. us-east1
+# <FIXME:zone>:  for e.g. us-east1-b
+
+imports:
+  - path: templates/gcs_bucket/gcs_bucket.py
+    name: gcs_bucket.py
+  - path: templates/kms/kms.py
+    name: kms.py
+  - path: templates/network/network.py
+    name: network.py
+  - path: templates/gke/gke.py
+    name: gke.py
+
+resources:
+  - name: <FIXME:service_account_name>
+    type: iam.v1.serviceAccount
+    properties:
+      accountId: <FIXME:service_account_name>
+      displayName: Vault Service Account
+
+  - name: <FIXME:vault_storage_bucket_name>
+    type: gcs_bucket.py
+    properties:
+      name: <FIXME:vault_storage_bucket_name>
+      location: <FIXME:region>
+      versioning:
+        enabled: True
+      bindings:
+        - role: roles/storage.objectAdmin
+          members:
+            - serviceAccount:<FIXME:service_account_email_address>
+        - role: roles/storage.legacyBucketReader
+          members:
+            - serviceAccount:<FIXME:service_account_email_address>
+
+  - name: vault-kms
+    type: kms.py
+    properties:
+      keyRingName: <FIXME:vault_keyring_name>
+      region: global
+      keys:
+        - cryptoKeyName: <FIXME:vault_cryptokey_name>
+          iamPolicyBinding:
+            - role: roles/cloudkms.cryptoKeyEncrypterDecrypter
+              members:
+                - serviceAccount:<FIXME:service_account_email_address>
+
+  - name: <FIXME:vault_network_name>
+    type: network.py
+    properties:
+      autoCreateSubnetworks: false
+      subnetworks:
+        - name: <FIXME:vault_subnetwork_name>
+          region: <FIXME:region>
+          ipCidrRange: 10.0.0.0/24
+          privateIpGoogleAccess: false
+          enableFlowLogs: true
+
+  - name: myk8s
+    type: gke.py
+    properties:
+      zone: <FIXME:zone>
+      cluster:
+        name: vault-cluster
+        description: Hashicorp Vault on gke
+        network: $(ref.<FIXME:vault_network_name>.networkUrl)
+        subnetwork: $(ref.<FIXME:vault_subnetwork_name>.name)
+        intialNodeCount: 3
+        initialClusterVersion: 1.11.2-gke.9
+        nodeConfig:
+          machineType: n1-standard-2
+          serviceAccount: <FIXME:service_account_email_address>
+          oauthScopes:
+            - https://www.googleapis.com/auth/logging.write
+            - https://www.googleapis.com/auth/monitoring
